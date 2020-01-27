@@ -224,6 +224,8 @@ class Matting:
                 # Flip RGB to BGR
                 foreground[i, j] = (X[0:3][::-1])
                 alpha[i, j] = X[3]
+        self._images["colOut"] = foreground
+        self._images["alphaOut"] = alpha
         success = True
         #########################################
 
