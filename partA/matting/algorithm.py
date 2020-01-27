@@ -152,7 +152,12 @@ class Matting:
         #########################################
         ## PLACE YOUR CODE BETWEEN THESE LINES ##
         #########################################
-
+        image = self._images[key]
+        retval = cv.imwrite(fileName, image)
+        if not retval:
+            msg = "Failed to write image with filename: " + fileName + ", key: " + key
+        else:
+            success = True
         #########################################
         return success, msg
 
@@ -161,32 +166,77 @@ class Matting:
     # ojbect.
     def triangulationMatting(self):
         """
-success, errorMessage = triangulationMatting(self)
+        success, errorMessage = triangulationMatting(self)
 
         Perform triangulation matting. Returns True if successful (ie.
         all inputs and outputs are valid) and False if not. When success=False
         an explanatory error message should be returned.
         """
-
         success = False
         msg = 'Placeholder'
 
         #########################################
         ## PLACE YOUR CODE BETWEEN THESE LINES ##
         #########################################
+        compA = self._images["compA"] / 255.0
+        c0r, c0g, c0b = compA[:, :, 0], compA[:, :, 1], compA[:, :, 2]
+        compB = self._images["compB"] / 255.0
+        c1r, c1g, c1b = compB[:, :, 0], compB[:, :, 1], compB[:, :, 2]
+        backA = self._images["backA"] / 255.0
+        b0r, b0g, b0b = backA[:, :, 0], backA[:, :, 1], backA[:, :, 2]
+        backB = self._images["backB"] / 255.0
+        b1r, b1g, b1b = backB[:, :, 0], backB[:, :, 1], backB[:, :, 2]
 
+        # Composite_delta = Composite - Background
+        cd0r, cd0g, cd0b = c0r- b0r, c0g - b0g, c0b - b0b
+        cd1r, cd1g, cd1b = c1r - b1r, c1g - b1g, c1b - b1b
+        # F' = aF, we use pseudo-inverse to find F'
+        (height, width, channels) = backA.shape
+        foreground = np.zeros((height, width, channels))
+        alpha = np.zeros((height, width))
+        A = np.array([[1, 0, 0, 0],
+                      [0, 1, 0, 0],
+                      [0, 0, 1, 0],
+                      [1, 0, 0, 0],
+                      [0, 1, 0, 0],
+                      [0, 0, 1, 0]], dtype=np.float64)
+        for i in range(height):
+            for j in range(width):
+                # The A in Ax = B
+                A[0, 3] = -b0r[i, j]
+                A[1, 3] = -b0g[i, j]
+                A[2, 3] = -b0b[i, j]
+                A[3, 3] = -b1r[i, j]
+                A[4, 3] = -b1g[i, j]
+                A[5, 3] = -b1b[i, j]
+
+                A_inverse = np.linalg.pinv(A)
+                # The B in AX = B
+                B = np.array([
+                    cd0r[i, j],
+                    cd0g[i, j],
+                    cd0b[i, j],
+                    cd1r[i, j],
+                    cd1g[i, j],
+                    cd1b[i, j]])
+                X = np.matmul(A_inverse, B)
+
+                # Flip RGB to BGR
+                foreground[i, j] = (X[0:3][::-1])
+                alpha[i, j] = X[3]
+        success = True
         #########################################
 
         return success, msg
 
     def createComposite(self):
         """
-success, errorMessage = createComposite(self)
+        success, errorMessage = createComposite(self)
 
         Perform compositing. Returns True if successful (ie.
         all inputs and outputs are valid) and False if not. When success=False
         an explanatory error message should be returned.
-"""
+        """
 
         success = False
         msg = 'Placeholder'
