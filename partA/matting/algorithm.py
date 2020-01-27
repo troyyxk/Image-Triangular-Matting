@@ -152,12 +152,7 @@ class Matting:
         #########################################
         ## PLACE YOUR CODE BETWEEN THESE LINES ##
         #########################################
-        image = self._images[key]
-        retval = cv.imwrite(fileName, image)
-        if not retval:
-            msg =  "Failed to write image with filename: " + fileName + ", key: " + key
-        else:
-            success = True
+
         #########################################
         return success, msg
 
