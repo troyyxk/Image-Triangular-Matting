@@ -134,7 +134,7 @@ class Matting:
             msg = "Failed to read image with filename: " + fileName + ", key: " + key
         else:  # on success
             success = True
-            self._images[key] = image
+            self._images[key] = image / 255.0
         #########################################
         return success, msg
 
@@ -153,6 +153,7 @@ class Matting:
         ## PLACE YOUR CODE BETWEEN THESE LINES ##
         #########################################
         image = self._images[key]
+
         retval = cv.imwrite(fileName, image)
         if not retval:
             msg = "Failed to write image with filename: " + fileName + ", key: " + key
@@ -178,14 +179,15 @@ class Matting:
         #########################################
         ## PLACE YOUR CODE BETWEEN THESE LINES ##
         #########################################
-        compA = self._images["compA"] / 255.0
-        c0r, c0g, c0b = compA[:, :, 0], compA[:, :, 1], compA[:, :, 2]
-        compB = self._images["compB"] / 255.0
-        c1r, c1g, c1b = compB[:, :, 0], compB[:, :, 1], compB[:, :, 2]
-        backA = self._images["backA"] / 255.0
-        b0r, b0g, b0b = backA[:, :, 0], backA[:, :, 1], backA[:, :, 2]
-        backB = self._images["backB"] / 255.0
-        b1r, b1g, b1b = backB[:, :, 0], backB[:, :, 1], backB[:, :, 2]
+        compA = self._images["compA"]
+        compB = self._images["compB"]
+        backA = self._images["backA"]
+        backB = self._images["backB"]
+
+        c0r, c0g, c0b = compA[:, :, 2], compA[:, :, 1], compA[:, :, 0]
+        c1r, c1g, c1b = compB[:, :, 2], compB[:, :, 1], compB[:, :, 0]
+        b0r, b0g, b0b = backA[:, :, 2], backA[:, :, 1], backA[:, :, 0]
+        b1r, b1g, b1b = backB[:, :, 2], backB[:, :, 1], backB[:, :, 0]
 
         # Composite_delta = Composite - Background
         cd0r, cd0g, cd0b = c0r- b0r, c0g - b0g, c0b - b0b
@@ -194,24 +196,20 @@ class Matting:
         (height, width, channels) = backA.shape
         foreground = np.zeros((height, width, channels))
         alpha = np.zeros((height, width))
-        A = np.array([[1, 0, 0, 0],
-                      [0, 1, 0, 0],
-                      [0, 0, 1, 0],
-                      [1, 0, 0, 0],
-                      [0, 1, 0, 0],
-                      [0, 0, 1, 0]], dtype=np.float64)
+
         for i in range(height):
             for j in range(width):
                 # The A in Ax = B
-                A[0, 3] = -b0r[i, j]
-                A[1, 3] = -b0g[i, j]
-                A[2, 3] = -b0b[i, j]
-                A[3, 3] = -b1r[i, j]
-                A[4, 3] = -b1g[i, j]
-                A[5, 3] = -b1b[i, j]
+                A = np.array([[1, 0, 0, -b0r[i, j]],
+                              [0, 1, 0, -b0g[i, j]],
+                              [0, 0, 1, -b0b[i, j]],
+                              [1, 0, 0, -b1r[i, j]],
+                              [0, 1, 0, -b1g[i, j]],
+                              [0, 0, 1, -b1b[i, j]]])
 
                 A_inverse = np.linalg.pinv(A)
                 # The B in AX = B
+
                 B = np.array([
                     cd0r[i, j],
                     cd0g[i, j],
@@ -219,11 +217,18 @@ class Matting:
                     cd1r[i, j],
                     cd1g[i, j],
                     cd1b[i, j]])
-                X = np.matmul(A_inverse, B)
-
+                X = np.clip(np.matmul(A_inverse, B).astype(np.float32), 0.0, 1.0)
                 # Flip RGB to BGR
                 foreground[i, j] = (X[0:3][::-1])
                 alpha[i, j] = X[3]
+        cv.imshow("my_fore.tif", foreground.astype(np.float32))
+        cv.imshow("my_alpha.tif", alpha.astype(np.float32))
+        cv.waitKey()
+        cv.destroyAllWindows()
+        foreground = foreground.astype(np.float32)
+        alpha = alpha.astype(np.float32)
+        print(foreground.dtype)
+        print(alpha.dtype)
         self._images["colOut"] = foreground
         self._images["alphaOut"] = alpha
         success = True
@@ -234,7 +239,6 @@ class Matting:
     def createComposite(self):
         """
         success, errorMessage = createComposite(self)
-
         Perform compositing. Returns True if successful (ie.
         all inputs and outputs are valid) and False if not. When success=False
         an explanatory error message should be returned.
@@ -246,7 +250,12 @@ class Matting:
         #########################################
         ## PLACE YOUR CODE BETWEEN THESE LINES ##
         #########################################
+        foreground = self._images['colIn']
+        alpha = self._images['alphaIn']
+        background = self._images['backIn']
 
+        compOut = foreground + (1 - alpha) * background
+        self._images['compOut'] = compOut
         #########################################
-
+        success = True
         return success, msg
