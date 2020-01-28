@@ -25,6 +25,30 @@ import cv2 as cv
 #########################################
 
 
+def createBMatrix(bArray):
+    bMatrix = [None]*6
+    j = 0
+    for i in range(len(bMatrix)):
+        bMatrix[i] = [None]*4
+        curRow = bMatrix[i]
+        curRow[0] = 0
+        curRow[1] = 0
+        curRow[2] = 0
+        curRow[j] = 1
+        j += 1
+        if j >= 3:
+            j = 0
+        curRow[3] = bArray[i]
+    return np.array(bMatrix)
+
+
+def createCMatrix(cArray, bArray):
+    cMatrix = [None]*6
+
+    for i in range(6):
+        cMatrix[i] = cArray[i] - bArray[i]
+
+    return np.array(cMatrix)
 #########################################
 
 #
@@ -38,6 +62,8 @@ import cv2 as cv
 # of this class. See function run() in file run.py for an
 # example of how it is called
 #
+
+
 class Matting:
     #
     # The class constructor
@@ -153,9 +179,10 @@ class Matting:
         ## PLACE YOUR CODE BETWEEN THESE LINES ##
         #########################################
         image = self._images[key]
-        retval = cv.imwrite(fileName, image)
+        # Question
+        retval = cv.imwrite(fileName, image.astype('uint8') * 255)
         if not retval:
-            msg =  "Failed to write image with filename: " + fileName + ", key: " + key
+            msg = "Failed to write image with filename: " + fileName + ", key: " + key
         else:
             success = True
         #########################################
@@ -180,6 +207,46 @@ success, errorMessage = triangulationMatting(self)
         ## PLACE YOUR CODE BETWEEN THESE LINES ##
         #########################################
 
+        # Step 1, Initialize the resulting alphaOut and colOut array
+        numRows = self._images['backA'].shape[0]
+        numCols = self._images['backA'].shape[1]
+        numRGB = self._images['backA'].shape[2]
+
+        alphaMatrix = [None] * numRows
+        frontMatrix = [None] * numRows
+
+        # Step 2,
+        for i in range(numRows):
+            alphaMatrix[i] = [None] * numCols
+            frontMatrix[i] = [None] * numCols
+            for j in range(numCols):
+                # Create combined matrix
+                cMatrix = createCMatrix(self._images['compA'][i][j].tolist() + self._images['compB'][i][j].tolist(),
+                                        self._images['backA'][i][j].tolist() + self._images['backB'][i][j].tolist())
+                # Create background Matrix
+                bMatrix = createBMatrix(
+                    self._images['backA'][i][j].tolist() + self._images['backB'][i][j].tolist())
+
+                piBMatrix = np.linalg.pinv(bMatrix)
+
+                # Get the result matrix
+                resultMatrix = np.matmul(piBMatrix, cMatrix)
+
+                alphaMatrix[i][j] = resultMatrix[3]
+                frontPixel = [None]*3
+                for k in range(3):
+                    frontPixel[k] = resultMatrix[k] / resultMatrix[3]
+                frontMatrix[i][j] = frontPixel
+
+        self._images['alphaOut'] = np.array(alphaMatrix)
+        self._images['colOut'] = np.array(frontMatrix)
+
+        # cv.imshow("colOut", self._images['colOut'])
+        # cv.imshow("alphaOut", self._images['alphaOut'])
+        # cv.waitKey(0)
+
+        success = True
+
         #########################################
 
         return success, msg
@@ -191,7 +258,7 @@ success, errorMessage = createComposite(self)
         Perform compositing. Returns True if successful (ie.
         all inputs and outputs are valid) and False if not. When success=False
         an explanatory error message should be returned.
-"""
+        """
 
         success = False
         msg = 'Placeholder'

@@ -72,7 +72,7 @@ if __name__ == '__main__':
             alphaMatrix[i][j] = resultMatrix[3]
             frontPixel = [None]*3
             for k in range(3):
-                frontPixel[k] = resultMatrix[k]
+                frontPixel[k] = resultMatrix[k] / resultMatrix[3]
             frontMatrix[i][j] = frontPixel
 
     alpha = np.array(alphaMatrix)
